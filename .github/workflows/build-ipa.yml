@@ -1,0 +1,56 @@
+name: Build Provenance IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Show Xcode
+        run: |
+          xcodebuild -version
+          xcode-select -p
+
+      - name: Install dependencies
+        run: |
+          if [ -f Gemfile ]; then
+            bundle install
+          fi
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -workspace Provenance.xcworkspace \
+            -scheme Provenance-Release
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -workspace Provenance.xcworkspace \
+            -scheme Provenance-Release \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Create IPA
+        run: |
+          mkdir -p Payload
+          cp -R "build/Build/Products/Release-iphoneos/Provenance.app" Payload/
+          zip -r Provenance-iOS-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Provenance-iOS-unsigned
+          path: Provenance-iOS-unsigned.ipa
